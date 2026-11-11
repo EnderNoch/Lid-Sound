@@ -41,6 +41,8 @@ that ends where it starts works best. A one-off noise works too, it just repeats
 
 - **Which Macs have the sensor.** The 16-inch MacBook Pro from 2019, MacBook Pros from 2021 on
   and MacBook Airs from M2 on. Without one, the panel says so and nothing plays.
+- **The menu bar shows what you pick.** The icon, the angle as text, or the angle inside the
+  icon, the way the battery shows its percentage. It is under Menu Bar in the panel.
 - **It costs almost nothing at rest.** While the lid is still the app checks it 10 times a
   second and the audio is switched off. It goes up to 60 times a second only while the lid
   moves.
@@ -101,6 +103,8 @@ zadziała, tylko będzie się powtarzał.
 
 - **Które Maki mają czujnik.** 16-calowy MacBook Pro z 2019, MacBooki Pro od 2021 i MacBooki
   Air od M2. Bez czujnika panel o tym mówi i nic nie gra.
+- **Pasek menu pokazuje to, co wybierzesz.** Ikonę, kąt jako tekst albo kąt w ikonie, tak jak
+  bateria pokazuje procent. Ustawia się to w panelu, w polu Pasek menu.
 - **W spoczynku prawie nic nie kosztuje.** Gdy klapa stoi, aplikacja sprawdza ją 10 razy na
   sekundę, a dźwięk jest wyłączony. Do 60 razy na sekundę przechodzi tylko w ruchu.
 - **Otwiera się przy logowaniu.** Dodaje się sama przy pierwszym uruchomieniu. Wyłączysz to

@@ -9,15 +9,13 @@ let appName = Bundle.main.localizedInfoDictionary?["CFBundleDisplayName"] as? St
 @main
 struct LidSoundApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    private let player = Player.shared
 
     var body: some Scene {
         // Always there; hiding it is System Settings → Menu Bar's job, and it keeps its place.
         MenuBarExtra {
             Panel()
         } label: {
-            Image(systemName: player.enabled ? "laptopcomputer" : "laptopcomputer.slash")
-                .accessibilityLabel(appName)
+            MenuBarLabel()
         }
         .menuBarExtraStyle(.window)
     }
@@ -71,6 +69,10 @@ struct Panel: View {
                 }
                 .disabled(!player.enabled)
 
+                Picker(s.menuBar, selection: $player.menuBar) {
+                    ForEach(MenuBarStyle.allCases) { Text($0.name(s)).tag($0) }
+                }
+
                 Divider()
 
                 Button(s.folder) { player.openFolder() }
@@ -88,5 +90,80 @@ struct Panel: View {
         .frame(width: 300)
         // A file just dropped into the Sounds folder shows up the next time the panel opens.
         .onAppear { player.rescan() }
+    }
+}
+
+/// What the menu bar shows, like the battery: just the icon, the angle as text, or the angle
+/// inside the icon the way the battery shows its percentage.
+enum MenuBarStyle: String, CaseIterable, Identifiable {
+    case icon, angle, angleInIcon
+    var id: Self { self }
+
+    func name(_ s: Strings) -> String {
+        switch self {
+        case .icon: s.icon
+        case .angle: s.angle
+        case .angleInIcon: s.angleInIcon
+        }
+    }
+}
+
+struct MenuBarLabel: View {
+    private let player = Player.shared
+    private let sensor = Sensor.shared
+
+    var body: some View {
+        Group {
+            switch (player.menuBar, sensor.angle) {
+            case (.angle, let angle?):
+                Text("\(angle)°").monospacedDigit()
+            case (.angleInIcon, let angle?):
+                Image(nsImage: Self.icon(angle: angle, dimmed: !player.enabled))
+            default:
+                Image(systemName: player.enabled ? "laptopcomputer" : "laptopcomputer.slash")
+            }
+        }
+        .accessibilityLabel(sensor.angle.map { player.s.lidAngle($0) } ?? appName)
+    }
+
+    /// The icon itself, unchanged (the system's "laptopcomputer" at menu bar size, 22 × 13
+    /// points), with the angle written on its screen. The digits are the system's compressed
+    /// face, as large as fits inside the screen's lines. A template image, so the menu bar
+    /// colors it; half strength while the sound is off.
+    private static func icon(angle: Int, dimmed: Bool) -> NSImage {
+        let laptop = NSImage(systemSymbolName: "laptopcomputer", accessibilityDescription: nil)!
+            .withSymbolConfiguration(.init(pointSize: 13, weight: .regular))!
+        // The symbol's screen inside its lines: 12.6 wide from x 4.6, 8.1 high from y 2.25.
+        let screen = NSRect(x: 4.6, y: 2.25, width: 12.6, height: 8.1)
+        let text = "\(angle)" as NSString
+        func font(_ size: Double) -> NSFont {
+            let compressed = NSFont.systemFont(ofSize: size, weight: .bold, width: .compressed)
+            let digits = compressed.fontDescriptor.addingAttributes([.featureSettings: [[
+                NSFontDescriptor.FeatureKey.typeIdentifier: kNumberSpacingType,
+                .selectorIdentifier: kMonospacedNumbersSelector,
+            ]]])
+            return NSFont(descriptor: digits, size: size) ?? compressed
+        }
+        let largest = 9.0
+        let room = screen.width - 0.6
+        let width = text.size(withAttributes: [.font: font(largest)]).width
+        let digits = font(width > room ? largest * room / width : largest)
+        let attributes: [NSAttributedString.Key: Any] = [.font: digits, .foregroundColor: NSColor.black]
+        let textWidth = text.size(withAttributes: attributes).width
+        let image = NSImage(size: laptop.size, flipped: false) { bounds in
+            laptop.draw(in: bounds)
+            // Digits centred on their cap height, not on the line with its descender.
+            let y = screen.midY - digits.capHeight / 2 + digits.descender
+            text.draw(at: NSPoint(x: screen.midX - textWidth / 2, y: y), withAttributes: attributes)
+            NSColor.black.set()
+            bounds.fill(using: .sourceAtop)
+            if dimmed {
+                NSColor.black.withAlphaComponent(0.5).set()
+                bounds.fill(using: .destinationIn)
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 }

@@ -52,6 +52,10 @@ final class Player {
         }
     }
 
+    var menuBar = MenuBarStyle(rawValue: UserDefaults.standard.string(forKey: "menuBar") ?? "") ?? .icon {
+        didSet { UserDefaults.standard.set(menuBar.rawValue, forKey: "menuBar") }
+    }
+
     private(set) var sounds = Sound.builtIn
 
     /// ~/Library/Application Support/Lid Sound/Sounds: every audio file in it is a sound.
