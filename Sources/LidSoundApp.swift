@@ -51,6 +51,13 @@ struct Panel: View {
                     Text("\(angle)°").monospacedDigit().foregroundStyle(.secondary)
                 }
             }
+            if sensor.angle != nil {
+                // What the sound follows: degrees per second, 0 the moment the lid stops.
+                Text(s.speed(sensor.speed))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
 
             if sensor.angle == nil {
                 Text(s.noSensor).foregroundStyle(.secondary)
@@ -60,6 +67,8 @@ struct Panel: View {
                 Picker(s.sound, selection: $player.soundID) {
                     ForEach(player.sounds) { Text($0.name).tag($0.id) }
                 }
+
+                if player.isPack { PackSection() }
 
                 HStack {
                     Image(systemName: "speaker.fill").foregroundStyle(.secondary)
@@ -165,5 +174,63 @@ struct MenuBarLabel: View {
         }
         image.isTemplate = true
         return image
+    }
+}
+
+/// A pack's three parts, each to hear on its own, and how its middle plays.
+struct PackSection: View {
+    private let player = Player.shared
+
+    var body: some View {
+        @Bindable var player = player
+        let s = player.s
+
+        VStack(alignment: .leading, spacing: 6) {
+            // Each part plays once on a click; a part the pack doesn't have is off.
+            HStack {
+                play(.start, s.start)
+                Spacer()
+                play(.middle, player.step ? s.step : s.middle)
+                Spacer()
+                play(.end, s.end)
+            }
+            .font(.caption)
+            .monospacedDigit()
+
+            // Without a middle there is nothing to loop or step through.
+            if player.lengths[.middle] != nil {
+                Picker(s.middle, selection: $player.step) {
+                    Text(s.loop).tag(false)
+                    Text(s.step).tag(true)
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Group {
+                Text(s.partsHint)
+                if player.step, player.lengths[.middle] != nil { Text(s.stepHint) }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// A part's button with its length; a step's has none, it is always one film frame.
+    private func play(_ part: Player.Part, _ name: String) -> some View {
+        let length = player.lengths[part]
+        let shown = part == .middle && player.step ? nil : length
+        return Button {
+            player.preview(part)
+        } label: {
+            Label(shown.map { "\(name) \(seconds($0))" } ?? name, systemImage: "play.fill")
+        }
+        .buttonStyle(.borderless)
+        .disabled(length == nil)
+    }
+
+    private func seconds(_ t: Double) -> String {
+        Measurement(value: t, unit: UnitDuration.seconds)
+            .formatted(.measurement(width: .abbreviated, numberFormatStyle: .number.precision(.fractionLength(1))))
     }
 }
