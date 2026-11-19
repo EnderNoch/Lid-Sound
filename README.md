@@ -42,7 +42,8 @@ that ends where it starts works best. A one-off noise works too, it just repeats
 above; `początek`, `środek` and `koniec` work too). The start plays as the lid starts to move,
 the middle while it moves, and the end when it stops; the middle fades out under the end, so
 nothing is cut off. Any part may be left out: a start and an end alone make a door that sounds
-as it starts and as it stops, with nothing in between. A pack plays at its own pitch, and the ▶
+as it starts and as it stops, with nothing in between. Every part follows the lid's speed, the
+start and the end too: lower and slower when it moves slowly, higher and quicker when fast. The ▶
 buttons in the panel play each part once.
 
 ```
@@ -68,7 +69,9 @@ clicks slowly and a fast one rattles, like a real hinge.
   exactly as LidAngleSensor measures it, read 30 times a second, and sets the loudness. When
   the lid starts and stops comes from the sensor's own one-degree steps instead, since the
   smoothed speed lags the lid: the start plays on the first step, the end about 0.15 s after
-  a fast lid stops and up to 0.8 s after a very slow one.
+  a fast lid stops and up to 0.8 s after a very slow one. A lid resting right between two
+  degrees makes the sensor flick between them; that is not movement, so a resting lid starts
+  only once it is two degrees from where it stopped, and the angle shown stays put.
 - **It costs almost nothing at rest.** While the lid is still the audio is switched off.
 - **Opens at login.** It adds itself on the first launch. Switch it off in System Settings →
   General → Login Items, and it stays off.
@@ -131,7 +134,8 @@ zadziała, tylko będzie się powtarzał.
 dowolnym z formatów wyżej; działają też `początek`, `środek` i `koniec`). Początek gra, gdy
 klapa rusza, środek, gdy się rusza, a koniec, gdy staje; środek wycisza się pod końcem, więc nic
 nie jest ucięte. Każdą część można pominąć: sam początek i koniec to drzwi, które odzywają się,
-gdy ruszają i gdy stają, a pomiędzy jest cisza. Paczka gra we własnej wysokości, a przyciski ▶
+gdy ruszają i gdy stają, a pomiędzy jest cisza. Każda część, także początek i koniec, idzie za prędkością
+klapy: przy wolnej gra niżej i wolniej, przy szybkiej wyżej i szybciej. Przyciski ▶
 w panelu grają raz każdą część.
 
 ```
@@ -157,7 +161,9 @@ trzaska wtedy powoli, a szybka terkocze, jak prawdziwy zawias.
   tak jak w LidAngleSensor, z odczytem 30 razy na sekundę, i ustala głośność. To, kiedy klapa
   rusza i staje, bierze się za to z samych kroków czujnika co stopień, bo wygładzona prędkość
   się spóźnia: początek gra przy pierwszym kroku, a koniec ok. 0,15 s po zatrzymaniu szybkiej
-  klapy i do 0,8 s po bardzo wolnej.
+  klapy i do 0,8 s po bardzo wolnej. Klapa stojąca dokładnie między dwoma stopniami sprawia, że
+  czujnik przeskakuje między nimi; to nie ruch, więc stojąca klapa rusza dopiero dwa stopnie od
+  miejsca, gdzie stanęła, a pokazany kąt się nie zmienia.
 - **W spoczynku prawie nic nie kosztuje.** Gdy klapa stoi, dźwięk jest wyłączony.
 - **Otwiera się przy logowaniu.** Dodaje się sama przy pierwszym uruchomieniu. Wyłączysz to
   w Ustawieniach → Ogólne → Rzeczy otwierane podczas logowania i już tak zostanie.

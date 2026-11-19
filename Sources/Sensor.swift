@@ -20,11 +20,14 @@ final class Sensor {
     /// smoothed speed, which lags the lid by up to a second (see `Motion`).
     var moving: Bool { motion.moving }
     @ObservationIgnored private var motion = Motion()
+    @ObservationIgnored private var lastRaw: Int?
+    @ObservationIgnored private var rawSince: TimeInterval = 0
 
     @ObservationIgnored private var manager: IOHIDManager?
     @ObservationIgnored private var device: IOHIDDevice?
 
-    /// Counts every degree the lid moves, so a listener can tell a new step from a repeat.
+    /// Counts every degree the lid moves while it moves, so a listener can tell a new step
+    /// from a repeat.
     @ObservationIgnored private(set) var steps = 0
 
     // LidAngleSensor's measuring state and constants, unchanged.
@@ -42,23 +45,36 @@ final class Sensor {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var onTick: ((Double) -> Void)?
 
+    @ObservationIgnored private var lastTry: TimeInterval = -10
+    @ObservationIgnored private var failures = 0
+
     /// Reads 30 times a second, as LidAngleSensor does; its smoothing is tuned to that pace.
+    /// The sensor can be missing for a moment, at login or after sleep, and can stop
+    /// answering; it is looked for again every two seconds until it answers.
     func start(onTick: @escaping (Double) -> Void) {
-        open()
-        guard device != nil else { return }
         self.onTick = onTick
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { _ in
-            MainActor.assumeIsolated {
-                Sensor.shared.read()
-                Sensor.shared.onTick?(Sensor.shared.velocity)
-            }
+            MainActor.assumeIsolated { Sensor.shared.tick() }
         }
         timer.tolerance = 0.003
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
     }
 
+    private func tick() {
+        let now = ProcessInfo.processInfo.systemUptime
+        if device == nil {
+            guard now - lastTry >= 2 else { return }
+            lastTry = now
+            open()
+            guard device != nil else { return }
+        }
+        read()
+        onTick?(velocity)
+    }
+
     private func open() {
+        if let manager { IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone)) }
         let manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
         let match: [String: Int] = [
             kIOHIDVendorIDKey: 0x05AC, kIOHIDProductIDKey: 0x8104,
@@ -77,15 +93,23 @@ final class Sensor {
     }
 
     private func read() {
-        guard let device, let a = Self.report(device) else { return }
-        let now = ProcessInfo.processInfo.systemUptime
-        // Only a real change wakes the panel, not every reading.
-        if angle != a {
-            if let old = angle { steps += abs(a - old) }
-            angle = a
-            motion.step(at: now)
+        guard let device else { return }
+        guard let a = Self.report(device) else {
+            // A second without an answer: let it go and look for it again.
+            failures += 1
+            if failures >= 30 { self.device = nil; failures = 0 }
+            return
         }
-        motion.check(at: now)
+        failures = 0
+        let now = ProcessInfo.processInfo.systemUptime
+        motion.read(a, at: now)
+        steps = motion.steps
+        // A lid resting right between two degrees reads one, then the other. The angle shown
+        // moves at once by two or more, or to a reading that has held for 0.3 s.
+        if a != lastRaw { lastRaw = a; rawSince = now }
+        if angle == nil || abs(a - (angle ?? a)) >= 2 || (a != angle && now - rawSince >= 0.3) || motion.moving {
+            if angle != a { angle = a }
+        }
         measure(Double(a), now: now)
         let rounded = Int(velocity.rounded())
         if speed != rounded { speed = rounded }
@@ -136,24 +160,42 @@ final class Sensor {
     }
 }
 
-/// When the lid starts and stops, from the sensor's raw steps. At rest the sensor gives the
-/// same whole degree reading after reading, so any change is real movement and starts it at
-/// once. It has stopped when no step came for 1.6 times the last gap between steps: a lid
-/// swung fast steps every reading and stops after 0.15 s, a slow one steps every few tenths
-/// and gets as long, up to 0.8 s. The first step after a rest has no gap yet and gets 0.5 s.
+/// When the lid starts and stops, from the sensor's raw steps. A lid at rest gives the same
+/// whole degree reading after reading, or, resting right between two, flicks between them;
+/// so a lid at rest starts moving only once it is two degrees from where it stopped. Then
+/// every step counts. It has stopped when no step came for 1.6 times the last gap between
+/// steps: a lid swung fast steps every reading and stops after 0.15 s, a slow one steps every
+/// few tenths and gets as long, up to 0.8 s. The first step after a rest has no gap yet and
+/// gets 0.5 s.
 struct Motion {
     private(set) var moving = false
+    /// Every degree stepped while moving.
+    private(set) var steps = 0
+    private var rest: Int?
+    private var last: Int?
     private var lastStep: TimeInterval = 0
     private var gap: TimeInterval?
 
-    mutating func step(at now: TimeInterval) {
-        gap = moving ? now - lastStep : nil
-        lastStep = now
-        moving = true
+    mutating func read(_ angle: Int, at now: TimeInterval) {
+        defer { check(at: now) }
+        guard let previous = last else {
+            last = angle; rest = angle; return
+        }
+        guard angle != previous else { return }
+        last = angle
+        if moving || abs(angle - (rest ?? angle)) >= 2 {
+            steps += abs(angle - previous)
+            gap = moving ? now - lastStep : nil
+            lastStep = now
+            moving = true
+        }
     }
 
-    mutating func check(at now: TimeInterval) {
+    private mutating func check(at now: TimeInterval) {
         let wait = gap.map { min(0.8, max(0.15, 1.6 * $0)) } ?? 0.5
-        if moving, now - lastStep > wait { moving = false }
+        if moving, now - lastStep > wait {
+            moving = false
+            rest = last
+        }
     }
 }

@@ -104,6 +104,8 @@ final class Player {
     @ObservationIgnored private let voices = (0..<6).map { _ in AVAudioPlayerNode() }
     @ObservationIgnored private var nextVoice = 0
     @ObservationIgnored private let varispeed = AVAudioUnitVarispeed()
+    /// The end's own varispeed: it follows the lid as it slows to a stop.
+    @ObservationIgnored private let tailSpeed = AVAudioUnitVarispeed()
     @ObservationIgnored private var head: AVAudioPCMBuffer?
     @ObservationIgnored private var loop: AVAudioPCMBuffer?
     @ObservationIgnored private var end: AVAudioPCMBuffer?
@@ -127,6 +129,7 @@ final class Player {
         engine.attach(node)
         engine.attach(tail)
         engine.attach(varispeed)
+        engine.attach(tailSpeed)
         voices.forEach(engine.attach)
         rescan()
         load()
@@ -170,13 +173,15 @@ final class Player {
         engine.disconnectNodeOutput(node)
         engine.disconnectNodeOutput(tail)
         engine.disconnectNodeOutput(varispeed)
+        engine.disconnectNodeOutput(tailSpeed)
         for v in voices {
             engine.disconnectNodeOutput(v)
             engine.connect(v, to: engine.mainMixerNode, format: format)
         }
         engine.connect(node, to: varispeed, format: format)
         engine.connect(varispeed, to: engine.mainMixerNode, format: format)
-        engine.connect(tail, to: engine.mainMixerNode, format: format)
+        engine.connect(tail, to: tailSpeed, format: format)
+        engine.connect(tailSpeed, to: engine.mainMixerNode, format: format)
         // All three play through the same nodes, so they take on one format, the middle's if
         // there is one.
         head = parts[.start].flatMap { Self.convert($0, to: format) }
@@ -190,6 +195,11 @@ final class Player {
         step = isPack && (UserDefaults.standard.dictionary(forKey: "step")?[soundID] as? Bool ?? false)
         gain = 0
         node.volume = 0
+        // A player's volume glides to a new value over a few hundredths of a second, and
+        // starts at full; set to silence here, the end and the ticks never begin with a
+        // full-volume burst.
+        tail.volume = 0
+        voices.forEach { $0.volume = 0 }
     }
 
     /// The pack's files by part; names are matched without case and without the extension.
@@ -282,15 +292,18 @@ final class Player {
         lastSteps = sensor.steps
         if target > 0 || stepped { lastMotion = now }
 
+        // Every part follows the lid's speed: a slow lid plays lower and slower, a fast one
+        // higher and quicker, the start as it gathers speed, the end as it slows to a stop.
+        rate += (0.8 + 0.4 * min(1, speed / 80) - rate) * (1 - exp(-dt / 0.08))
+        varispeed.rate = Float(rate)
+        tailSpeed.rate = Float(rate)
         if split {
             let t = min(1, max(0, (speed - 10) / 90))
             playParts(loudness: 1 - t * t * (3 - 2 * t), stepped: stepped,
                       stopped: !sensor.moving, now: now, dt: dt)
         } else {
             gain += (target - gain) * (1 - exp(-dt / 0.05))
-            rate += (0.8 + 0.3 * min(1, speed / 100) - rate) * (1 - exp(-dt / 0.08))
             if target > 0 { resume() }
-            varispeed.rate = Float(rate)
         }
         node.volume = Float(gain * volume)
 
@@ -298,9 +311,8 @@ final class Player {
         if phase != .playing, now - lastMotion > 1, now > endsAt + 0.2 { pause() }
     }
 
-    /// Start, middle and end, at the recording's own pitch.
+    /// Start, middle and end.
     private func playParts(loudness: Double, stepped: Bool, stopped: Bool, now: TimeInterval, dt: Double) {
-        varispeed.rate = 1
         switch phase {
         case .idle, .ending:
             if !stopped { begin(loudness: loudness, now: now) }
