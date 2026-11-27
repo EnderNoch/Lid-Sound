@@ -19,7 +19,7 @@ Tested on a MacBook Air with M5, macOS 27.
 
 ## Install
 
-1. Download [Lid-Sound.zip](https://github.com/EnderNoch/Lid-Sound/raw/main/Lid-Sound.zip)
+1. Download [Lid-Sound.zip](https://github.com/EnderNoch/Lid-Sound/releases/latest/download/Lid-Sound.zip)
    and unzip it (double-click).
 2. Drag `Lid Sound.app` into Applications and open it. A laptop icon appears in the menu bar.
    There is no window and no Dock icon.
@@ -110,7 +110,7 @@ Testowane na MacBooku Air z M5, macOS 27.
 
 ### Instalacja
 
-1. Pobierz [Lid-Sound.zip](https://github.com/EnderNoch/Lid-Sound/raw/main/Lid-Sound.zip)
+1. Pobierz [Lid-Sound.zip](https://github.com/EnderNoch/Lid-Sound/releases/latest/download/Lid-Sound.zip)
    i rozpakuj go (dwuklik).
 2. Przeciągnij `Lid Sound.app` do folderu Aplikacje i otwórz. Na pasku menu pojawi się ikona
    laptopa. Nie ma okna ani ikony w Docku.
